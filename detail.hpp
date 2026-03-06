@@ -1,6 +1,6 @@
 #pragma once
 
-inline std::vector<std::vector<int>> lpp::detail::generate_combination(const int n, const int k) {
+inline std::vector<std::vector<int>> lpp::detail::generate_combinations(const int n, const int k) {
     std::vector<int> curr;
     std::vector<std::vector<int>> ans;
 

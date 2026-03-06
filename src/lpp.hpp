@@ -1,7 +1,17 @@
 #pragma once
 
 class lpp::LPP {
+    inline static const Variable B{"@"}, M{"M"}, Z{"Z"}; // '@' for ascii arrangement
+    Optimization type;
+    Polynomial objective;
+    std::vector<Inequation> constraints, restrictions;
+
+    friend class ComputationalTable;
+    friend std::vector<std::map<Variable, Fraction>> lpp::basic_feasible_solutions(const std::vector<Equation>&);
+
 public:
+    static Inequation unrestrict(const Variable& variable) { return Inequation(variable, {}, inf); }
+
     LPP() = default;
 
     LPP standardize(const bool dual = false) const {
@@ -13,17 +23,11 @@ public:
             lpp.type = Optimization::MAXIMIZE;
         }
         for (Inequation& constraint : lpp.constraints) {
-            if (dual) {
-                if (constraint.opr == RelationalOperator::GE) {
-                    constraint = constraint.invert();
-                }
-            } else {
-                if (static_cast<Fraction>(constraint.rhs) < 0) {
-                    constraint = constraint.invert();
-                }
+            if (dual && constraint.opr == RelationalOperator::GE || !dual && static_cast<Fraction>(constraint.rhs) < 0) {
+                constraint = constraint.invert();
             }
             if (constraint.opr != RelationalOperator::EQ) {
-                Variable variable(std::string("s") + std::to_string(i++));
+                Variable variable("s" + std::to_string(i++));
                 constraint = Equation(constraint.lhs + (constraint.opr == RelationalOperator::LE ? variable : -variable), constraint.rhs);
             }
         }
@@ -50,30 +54,23 @@ public:
         return lpp;
     }
 
-    inline static const Variable B{"@"}, M{"M"}, Z{"Z"}; // '@' for ascii arrangement
-    Optimization type;
-    Polynomial objective;
-    std::vector<Inequation> constraints, restrictions;
-
     LPP(const Optimization type, const Polynomial& objective, const std::vector<Inequation>& constraints,
         const std::vector<Inequation>& restrictions) :
         type(type), objective(objective), constraints(constraints), restrictions(restrictions) {} // need to add variables integrity check
 
-    static Inequation unrestrict(const Variable& variable) { return Inequation(variable, {}, inf); }
-
-    ComputationalTable optimize(const std::string& = "simplex", bool = false) const;
+    ComputationalTable optimize(const std::string& = "simplex", bool = false, std::ostream& = std::cout) const;
 
     LPP dual(const std::string& = "w") const;
 
     friend std::ostream& operator<<(std::ostream& out, const LPP& lpp) {
         const int size = lpp.restrictions.size();
-        out << (lpp.type == Optimization::MAXIMIZE ? "Maximize" : "Minimize") << "   " << lpp.objective << std::endl;
-        out << "subject to " << lpp.constraints.front() << std::endl;
+        out << (lpp.type == Optimization::MAXIMIZE ? "Maximize" : "Minimize") << '\t' << lpp.objective << std::endl;
+        out << "subject to  " << lpp.constraints.front() << std::endl;
 
         for (const Inequation& constraint : lpp.constraints | std::views::drop(1)) {
-            out << "\t   " << constraint << std::endl;
+            out << "            " << constraint << std::endl;
         }
-        out << "\t   ";
+        out << "            ";
 
         for (int i = 0; i < size; i++) {
             if (lpp.restrictions[i].lhs.is_fraction() && static_cast<Fraction>(lpp.restrictions[i].lhs) == inf ||
@@ -101,10 +98,9 @@ inline std::vector<std::map<algebra::Variable, algebra::Fraction>> lpp::basic_fe
     }
     const int col = std::ranges::max(variables | std::views::drop(1) | std::views::values, {}, &std::vector<Fraction>::size).size();
     const int row = variables.size() - 1, n = std::max(row, col), k = std::min(row, col);
-    const std::vector<std::vector<int>> combinations = detail::generate_combination(n, k);
     std::vector<std::map<Variable, Fraction>> result;
 
-    for (const std::vector<int>& combination : combinations) {
+    for (const std::vector<int>& combination : detail::generate_combinations(n, k)) {
         Matrix<Fraction> B(k, k), C(k, 1);
         std::vector<Variable> X;
         X.reserve(k);

@@ -1,69 +1,72 @@
+#include <fstream>
 #include "lpp.hpp"
 
 using namespace lpp;
+inline static std::ofstream out("output.txt");
 
 void test(LPP&& lpp, const std::string& method = "simplex", const Variable& var = Variable(), const Matrix<Fraction>& coefficients = {}) {
     if (method == "simplex" || method == "dual") {
-        std::cout << lpp;
-        const std::variant<std::vector<std::map<Variable, Fraction>>, std::string> res = lpp.optimize(method, true).get_solutions(method, true);
+        out << lpp;
+        const std::variant<std::vector<std::map<Variable, Fraction>>, std::string> res =
+            lpp.optimize(method, true, out).get_solutions(method, true, out);
 
         if (auto ans = std::get_if<std::vector<std::map<Variable, Fraction>>>(&res)) {
             for (const std::map<Variable, Fraction>& i : *ans) {
                 for (const auto& [variable, fraction] : i) {
-                    std::cout << variable << '=' << fraction << " ";
+                    out << variable << '=' << fraction << " ";
                 }
-                std::cout << std::endl;
+                out << std::endl;
             }
         } else {
-            std::cout << std::get<std::string>(res);
+            out << std::get<std::string>(res);
         }
     } else if (method.starts_with("Var")) {
-        std::cout << lpp;
+        out << lpp;
         lpp = lpp.standardize();
         ComputationalTable computational_table(lpp);
-        computational_table.optimize_simplex(true);
-        std::cout << computational_table;
+        computational_table.optimize_simplex(true, out);
+        out << computational_table;
 
         if (method.ends_with("add") || method.ends_with("remove")) {
-            std::cout << "BEFORE:" << std::endl << computational_table;
+            out << "BEFORE:" << std::endl << computational_table;
             if (method.ends_with("add")) {
                 computational_table.add_variable(var, coefficients);
             } else {
                 computational_table.remove_variable(var);
             }
-            std::cout << "AFTER:" << std::endl << computational_table;
-            computational_table.optimize_simplex(true);
-            const std::variant<std::vector<std::map<Variable, Fraction>>, std::string> res = computational_table.get_solutions("simplex", true);
+            out << "AFTER:" << std::endl << computational_table;
+            computational_table.optimize_simplex(true, out);
+            const std::variant<std::vector<std::map<Variable, Fraction>>, std::string> res = computational_table.get_solutions("simplex", true, out);
 
             if (auto ans = std::get_if<std::vector<std::map<Variable, Fraction>>>(&res)) {
                 for (const std::map<Variable, Fraction>& i : *ans) {
                     for (const auto& [variable, fraction] : i) {
-                        std::cout << variable << '=' << fraction << " ";
+                        out << variable << '=' << fraction << " ";
                     }
-                    std::cout << std::endl;
+                    out << std::endl;
                 }
             } else {
-                std::cout << std::get<std::string>(res);
+                out << std::get<std::string>(res);
             }
         } else {
             for (const Interval& interval : method.ends_with('C') ? computational_table.variation_C() : computational_table.variation_B()) {
-                std::cout << interval << std::endl;
+                out << interval << std::endl;
             }
         }
     } else {
-        std::cout << lpp.dual(method);
+        out << lpp << std::endl << "Dual:" << std::endl << lpp.dual(method);
     }
-    std::cout << std::endl << std::endl;
+    out << std::endl << std::endl;
 }
 
 void test(std::vector<std::map<Variable, Fraction>>&& res) {
     for (const std::map<Variable, Fraction>& result : res) {
         for (const auto& [variable, fraction] : result) {
-            std::cout << variable << '=' << fraction << ' ';
+            out << variable << '=' << fraction << ' ';
         }
-        std::cout << std::endl;
+        out << std::endl;
     }
-    std::cout << std::endl << std::endl;
+    out << std::endl << std::endl;
 }
 
 int main() {
@@ -349,6 +352,61 @@ int main() {
              },
              {x >= 0, y >= 0}),
          "Var remove", y);
+    // Mid Term Examination
+    test(LPP(Optimization::MAXIMIZE, 3 * x - 5 * y,
+             {
+                 4 * x + 3 * y >= 5,
+                 2 * x - 5 * y <= 3,
+             },
+             {x >= 0, y >= 0}),
+         "w");
+    test(LPP(Optimization::MAXIMIZE, 2 * x + y,
+             {
+                 x - y <= 10,
+                 2 * x - y <= 40,
+             },
+             {x >= 0, y >= 0}));
+    test(LPP(Optimization::MAXIMIZE, 5 * x - y,
+             {
+                 3 * x + 5 * y <= 15,
+                 4 * x + 3 * y <= 12,
+             },
+             {x >= 0, y >= 0}));
+    test(LPP(Optimization::MAXIMIZE, x1 + x2,
+             {
+                 x1 + x2 <= 8,
+                 2 * x1 + x2 <= 10,
+             },
+             {x1 >= 0, x2 >= 0}),
+         "Var B");
+    test(LPP(Optimization::MAXIMIZE, -4 * x - y,
+             {
+                 3 * x + y == 3,
+                 4 * x + 3 * y >= 6,
+                 x + 2 * y <= 3,
+             },
+             {x >= 0, y >= 0}));
+    test(LPP(Optimization::MINIMIZE, x1 - 3 * x2 + 2 * x3,
+             {
+                 3 * x1 - x2 + 2 * x3 <= 7,
+                 -2 * x1 + 4 * x2 <= 12,
+                 -4 * x1 + 3 * x2 + 8 * x3 <= 10,
+             },
+             {x1 >= 0, x2 >= 0, x3 >= 0}));
+    test(LPP(Optimization::MINIMIZE, 5 * x + 6 * y,
+             {
+                 x + y >= 2,
+                 4 * x + y >= 4,
+             },
+             {x >= 0, y >= 0}),
+         "dual");
+    test(LPP(Optimization::MAXIMIZE, 3 * x1 + 5 * x2,
+             {
+                 x1 + x2 <= 1,
+                 2 * x1 + 3 * x2 <= 1,
+             },
+             {x >= 0, y >= 0}),
+         "Var C");
     // ComputationalTable table(std::map<Variable, Variable>{{x1, 2}, {x2, 4}, {x3, 1}, {x4, 3}, {x5, 2}, {s1, 0}, {s2, 0}, {s3, 0}},
     //     {x1, x2, x3},
     //     {{}});

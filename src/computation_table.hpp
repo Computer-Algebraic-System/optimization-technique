@@ -1,7 +1,7 @@
 #pragma once
 
 class lpp::ComputationalTable {
-    static Fraction extract_M_coefficient(const Polynomial& polynomial) {
+    static Fraction extract_coefficient_M(const Polynomial& polynomial) {
         const auto itr = std::ranges::find(polynomial.expression, LPP::M, &Variable::basis);
 
         if (itr != polynomial.expression.end()) {
@@ -64,8 +64,8 @@ public:
         lpp(), solution(solution), basis_vector(basis_vector), cost(cost), coefficient_matrix(coefficient_matrix) {}
 
     std::variant<std::vector<std::map<Variable, Fraction>>, std::string> get_solutions(const std::string& method = "simplex",
-                                                                                       const bool verbose = false) {
-        auto add_solution = [this, verbose]() -> std::map<Variable, Fraction> {
+                                                                                       const bool verbose = false, std::ostream& out = std::cout) {
+        auto add_solution = [this, verbose, &out]() -> std::map<Variable, Fraction> {
             std::map<Variable, Fraction> res;
             const int size = lpp.constraints.size();
 
@@ -77,14 +77,14 @@ public:
             res[LPP::Z] *= lpp.type == Optimization::MINIMIZE ? -1 : 1;
 
             if (verbose) {
-                std::cout << *this;
+                out << *this;
             }
             return res;
         };
         std::vector<std::map<Variable, Fraction>> res;
 
         while (true) {
-            solution = method == "simplex" ? optimize_simplex(verbose) : optimize_dual_simplex(verbose);
+            solution = method == "simplex" ? optimize_simplex(verbose, out) : optimize_dual_simplex(verbose, out);
 
             switch (solution) {
             case Solution::OPTIMIZED:
@@ -117,7 +117,7 @@ public:
         std::unreachable();
     }
 
-    Solution optimize_simplex(const bool verbose = false) {
+    Solution optimize_simplex(const bool verbose = false, std::ostream& out = std::cout) {
         if (solution != Solution::UNOPTIMIZED && solution != Solution::ALTERNATE) {
             return solution;
         }
@@ -137,7 +137,7 @@ public:
                     zj_cj.push_back(polynomial - cost[variable]);
                 }
 
-                if (std::ranges::all_of(zj_cj, [](const Polynomial& polynomial) -> bool { return extract_M_coefficient(polynomial) >= 0; })) {
+                if (std::ranges::all_of(zj_cj, [](const Polynomial& polynomial) -> bool { return extract_coefficient_M(polynomial) >= 0; })) {
                     solution =
                         std::ranges::contains(basis_vector, 'A', [](const Variable& variable) -> char { return variable.variables[0].name[0]; })
                         ? Solution::INFEASIBLE
@@ -170,13 +170,13 @@ public:
                     ++ev;
                 }
             } else {
-                ev = std::next(coefficient_matrix.begin(), std::ranges::min_element(zj_cj, {}, extract_M_coefficient) - zj_cj.begin() + 1); // B
+                ev = std::next(coefficient_matrix.begin(), std::ranges::min_element(zj_cj, {}, extract_coefficient_M) - zj_cj.begin() + 1); // B
             }
             for (int i = 0; i < size; i++) {
                 mr.push_back(ev->second[i] <= 0 ? inf : coefficient_matrix[LPP::B][i] / ev->second[i]);
             }
             if (verbose) {
-                std::cout << *this;
+                out << *this;
             }
             int lv = std::ranges::min_element(mr) - mr.begin();
             bool unbounded = true;
@@ -239,7 +239,7 @@ public:
         }
     }
 
-    Solution optimize_dual_simplex(const bool verbose = false) {
+    Solution optimize_dual_simplex(const bool verbose = false, std::ostream& out = std::cout) {
         solution = Solution::UNBOUNDED;
         const int size = coefficient_matrix[LPP::B].size();
         Matrix<Fraction> unit_matrix = Matrix<Fraction>::make_identity(size);
@@ -260,7 +260,7 @@ public:
                 return solution = Solution::OPTIMIZED;
             }
             if (verbose) {
-                std::cout << *this;
+                out << *this;
             }
             const int lv = std::ranges::min_element(coefficient_matrix[LPP::B]) - coefficient_matrix[LPP::B].begin(), zj_cj_size = zj_cj.size();
             const auto begin = std::next(coefficient_matrix.begin()); // B
@@ -405,7 +405,7 @@ public:
     friend std::ostream& operator<<(std::ostream& out, const ComputationalTable& computational_table) {
         static constexpr int TAB_SIZE = 11;
         const int size = computational_table.basis_vector.size(), columns = 3 + computational_table.coefficient_matrix.size();
-        auto print_partition = [columns, &out]() -> void {
+        auto print_partition = [columns, &out] -> void {
             out << std::right << std::setfill('-') << '+';
 
             for (int i = 0; i < columns; i++) {
@@ -413,36 +413,41 @@ public:
             }
             out << std::endl << std::left << std::setfill(' ');
         };
+        auto format = [](const auto& value) -> std::string {
+            const std::string res = std::to_string(value);
+            const int remaining = TAB_SIZE - res.size();
+            return std::string(remaining / 2, ' ') + res + std::string(remaining - remaining / 2, ' ');
+        };
         out << std::left << ' ';
 
         for (int i = 0; i < 3; i++) {
             out << std::setw(TAB_SIZE) << "" << ' ';
         }
         for (const Variable& variable : computational_table.coefficient_matrix | std::views::drop(1) | std::views::keys) { // B
-            out << std::setw(TAB_SIZE) << computational_table.cost.at(variable) << ' ';
+            out << format(computational_table.cost.at(variable)) << ' ';
         }
         out << std::endl;
         print_partition();
         out << '|';
 
-        for (const char* string : {"BV", "C", "B"}) {
-            out << std::setw(TAB_SIZE) << string << '|';
+        for (const std::string string : {"BV", "C", "B"}) {
+            out << format(string) << '|';
         }
         for (const Variable& variable : computational_table.coefficient_matrix | std::views::drop(1) | std::views::keys) { // B
-            out << std::setw(TAB_SIZE) << variable.variables[0].name << '|';
+            out << format(variable.variables[0].name) << '|';
         }
-        out << std::setw(TAB_SIZE) << "MR" << '|' << std::endl;
+        out << format(std::string("MR")) << '|' << std::endl;
         print_partition();
 
         for (int i = 0; i < size; i++) {
-            out << '|' << std::setw(TAB_SIZE) << computational_table.basis_vector[i] << '|' << std::setw(TAB_SIZE)
-                << computational_table.cost.at(computational_table.basis_vector[i]) << '|';
+            out << '|' << format(computational_table.basis_vector[i]) << '|' << std::setw(TAB_SIZE)
+                << format(computational_table.cost.at(computational_table.basis_vector[i])) << '|';
 
             for (const std::vector<Fraction>& fractions : computational_table.coefficient_matrix | std::views::values) {
-                out << std::setw(TAB_SIZE) << fractions[i] << '|';
+                out << format(fractions[i]) << '|';
             }
             if (!computational_table.mr.empty()) {
-                out << std::setw(TAB_SIZE) << (computational_table.mr[i] == inf ? "-ve" : std::to_string(computational_table.mr[i])) << '|';
+                out << format(computational_table.mr[i] == inf ? "-ve" : std::to_string(computational_table.mr[i])) << '|';
             } else {
                 out << std::setw(TAB_SIZE) << "" << '|';
             }
@@ -454,10 +459,10 @@ public:
         for (int i = 0; i < 2; i++) {
             out << std::setw(TAB_SIZE) << "" << '|';
         }
-        out << std::setw(TAB_SIZE) << "Zj-Cj" << '|';
+        out << format(std::string("Zj-Cj")) << '|';
 
         for (const Polynomial& polynomial : computational_table.zj_cj) {
-            out << std::setw(TAB_SIZE) << polynomial << '|';
+            out << format(polynomial) << '|';
         }
         out << std::setw(TAB_SIZE) << "" << '|' << std::endl;
         print_partition();
@@ -476,7 +481,12 @@ inline lpp::LPP lpp::LPP::dual(const std::string& basis) const {
     }
     const int objective_size = canonical.objective.expression.size(), constraints_size = canonical.constraints.size();
     LPP res;
-    ComputationalTable computational_table(*this);
+    ComputationalTable computational_table(canonical);
+    std::erase_if(computational_table.coefficient_matrix,
+                  [](const std::pair<Variable, std::vector<Fraction>>& element) -> bool { return element.first.variables[0].name[0] == 'A'; });
+    std::erase_if(computational_table.cost, [](const std::pair<Variable, Variable>& element) -> bool {
+        return !element.second.variables.empty() && element.second.variables[0].name == "M";
+    });
     res.type = canonical.type == Optimization::MAXIMIZE ? Optimization::MINIMIZE : Optimization::MAXIMIZE;
     res.constraints.resize(objective_size);
     res.restrictions.reserve(constraints_size);
@@ -506,12 +516,12 @@ inline lpp::LPP lpp::LPP::dual(const std::string& basis) const {
     return res;
 }
 
-inline lpp::ComputationalTable lpp::LPP::optimize(const std::string& method, const bool verbose) const {
+inline lpp::ComputationalTable lpp::LPP::optimize(const std::string& method, const bool verbose, std::ostream& out) const {
     assert(method == "simplex" || method == "dual");
     const LPP lpp = method == "simplex" ? standardize() : canonicalize().standardize(true);
 
     if (verbose) {
-        std::cout << std::endl << (method == "simplex" ? "Standard" : "Canonical") << " Form: " << std::endl << lpp;
+        out << std::endl << (method == "simplex" ? "Standard" : "Canonical") << " Form: " << std::endl << lpp;
     }
     return ComputationalTable(lpp);
 }

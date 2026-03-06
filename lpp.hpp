@@ -7,8 +7,8 @@
 namespace lpp {
     using namespace algebra;
 
-    enum class Optimization { MAXIMIZE, MINIMIZE };
-    enum class Solution { UNOPTIMIZED, OPTIMIZED, INFEASIBLE, UNBOUNDED, ALTERNATE };
+    enum class Optimization : bool { MINIMIZE, MAXIMIZE };
+    enum class Solution : uint8_t { UNOPTIMIZED, OPTIMIZED, INFEASIBLE, UNBOUNDED, ALTERNATE };
 
     class LPP;
     class ComputationalTable;
@@ -16,7 +16,7 @@ namespace lpp {
     std::vector<std::map<Variable, Fraction>> basic_feasible_solutions(const std::vector<Equation>&);
 
     namespace detail {
-        std::vector<std::vector<int>> generate_combination(int, int);
+        std::vector<std::vector<int>> generate_combinations(int, int);
     } // namespace detail
 } // namespace lpp
 
