@@ -8,8 +8,8 @@ using namespace optimization;
 inline static std::ofstream out("output.txt");
 
 void print_solutions(const std::variant<std::vector<std::map<Variable, Fraction>>, std::string>& res) {
-    if (auto ans = std::get_if<std::vector<std::map<Variable, Fraction>>>(&res)) {
-        for (const auto& solution : *ans) {
+    if (const std::vector<std::map<Variable, Fraction>>* ans = std::get_if<std::vector<std::map<Variable, Fraction>>>(&res)) {
+        for (const std::map<Variable, Fraction>& solution : *ans) {
             for (const auto& [variable, fraction] : solution) {
                 out << variable << '=' << fraction << " ";
             }
@@ -48,8 +48,7 @@ void test(LPP&& lpp, const std::string& method = "simplex", const Variable& var 
             }
         }
     } else if (method == "graphical") {
-        out << lpp;
-        print_solutions(lpp.graphical_optimize(var.variables.front().name));
+        print_solutions(lpp.optimize_graphical(var.variables.front().name));
     } else {
         out << lpp << "\nDual:\n" << lpp.dual(method);
     }
@@ -105,11 +104,14 @@ void test(ComputationalTable&& table, const std::string& method = "simplex", con
     out << std::string(150, '-') << std::endl;
 }
 
+void test(IPP&& ipp, const std::string& path) { print_solutions(ipp.optimize_branch_bound(path)); }
+
 int main() {
     const Variable x("x"), y("y"), z("z"), x1("x1"), x2("x2"), x3("x3"), x4("x4"), x5("x5"), s1("s1"), s2("s2"), s3("s3");
     linalg::GLOBAL_FORMATTING = {true, &out};
     optimization::GLOBAL_FORMATTING = {true, &out};
 
+    /*
     test(LPP(Optimization::MAXIMIZE, 2 * x + 7 * y,
              {
                  3 * x + 5 * y <= 15,
@@ -160,6 +162,7 @@ int main() {
              },
              {x >= 0, y >= 0}),
          "graphical", Variable("outputs/graph7.png"));
+         */
     test(LPP(Optimization::MAXIMIZE, 3 * x + 2 * y,
              {
                  x + y <= 4,
@@ -535,8 +538,8 @@ int main() {
              },
              Solution::OPTIMIZED, {}),
          "Constraint add", {}, 3 * x1 + x2 + 2 * x3 + x4 + 9 * x5 <= 19);
-    /*
     // Mid Term Examination
+    // one graphical question
     test(LPP(Optimization::MAXIMIZE, 3 * x - 5 * y,
              {
                  4 * x + 3 * y >= 5,
@@ -591,6 +594,43 @@ int main() {
              },
              {x >= 0, y >= 0}),
          "Var C");
-    */
+    // IPP
+    test(IPP(Optimization::MAXIMIZE, x + 4 * y,
+             {
+                 2 * x + 4 * y <= 7,
+                 5 * x + 3 * y <= 15,
+             },
+             {x >= 0, y >= 0}),
+         "outputs/ipp1");
+    test(IPP(Optimization::MAXIMIZE, 7 * x + 9 * y,
+             {
+                 -x + 3 * y <= 6,
+                 7 * x + y <= 35,
+                 y <= 7,
+             },
+             {x >= 0, y >= 0}),
+         "outputs/ipp2");
+    test(IPP(Optimization::MAXIMIZE, 2 * x + 3 * y,
+             {
+                 6 * x + 5 * y <= 12,
+                 4 * x + 2 * y >= 14,
+             },
+             {x >= 0, y >= 0}),
+         "outputs/ipp3");
+    test(IPP(Optimization::MAXIMIZE, 3 * x + 4 * y,
+             {
+                 3 * x - y <= 12,
+                 3 * x + 11 * y <= 66,
+             },
+             {x >= 0, y >= 0}),
+         "outputs/ipp4");
+    test(IPP(Optimization::MINIMIZE, 2 * x + 3 * y,
+             {
+                 2 * x + 3 * y <= 7,
+                 x <= 2,
+                 y <= 2,
+             },
+             {x >= 0, y >= 0}),
+         "outputs/ipp5");
     return 0;
 }

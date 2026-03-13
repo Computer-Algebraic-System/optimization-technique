@@ -2,6 +2,7 @@
 #include "../linear-algebra/linalg.hpp"
 
 class optimization::LPP {
+protected:
     Optimization type;
     algebra::Polynomial objective;
     std::vector<algebra::Inequation> constraints, restrictions;
@@ -62,7 +63,7 @@ public:
         return lpp;
     }
 
-    std::variant<std::vector<std::map<algebra::Variable, algebra::Fraction>>, std::string> graphical_optimize(const std::string& path) const {
+    std::variant<std::vector<std::map<algebra::Variable, algebra::Fraction>>, std::string> optimize_graphical(const std::string& path) const {
         assert(objective.expression.size() <= 2);
         const int size = constraints.size();
         algebra::Point res;
@@ -74,8 +75,13 @@ public:
         graph.source_path = "/home/dream/github/optimization-technique/linear-algebra/algebra/utils/graph.py";
         polynomials.reserve(size);
 
+        if (GLOBAL_FORMATTING.verbose) {
+            *GLOBAL_FORMATTING.out << *this;
+        }
         for (const algebra::Inequation& constraint : constraints) {
-            polynomials.push_back(constraint.lhs / static_cast<algebra::Fraction>(constraint.rhs));
+            if (static_cast<algebra::Fraction>(constraint.rhs) != 0) {
+                polynomials.push_back(constraint.lhs / static_cast<algebra::Fraction>(constraint.rhs));
+            }
 
             for (const algebra::Variable& variable : polynomials.back().expression) {
                 if (variable.variables == algebra::Variable("x").variables) {
@@ -90,6 +96,9 @@ public:
                 linalg::solve_linear_system({algebra::Equation(constraints[combination[0]]), algebra::Equation(constraints[combination[1]])});
             points.emplace_back(solution[algebra::Variable("x")], solution[algebra::Variable("y")]);
         }
+        std::ranges::sort(points);
+        points.erase(std::ranges::unique(points).begin(), points.end());
+
         for (const algebra::Point& point : points) {
             std::vector<std::pair<std::string, algebra::Fraction>> substituent = {{"x", point.x}, {"y", point.y}};
 

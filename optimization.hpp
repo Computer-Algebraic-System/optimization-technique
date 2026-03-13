@@ -1,6 +1,7 @@
 #pragma once
 #include <iomanip>
 #include <map>
+#include <queue>
 #include "linear-algebra/linalg.hpp"
 
 namespace optimization {
@@ -13,9 +14,11 @@ namespace optimization {
     enum class Solution : uint8_t { UNOPTIMIZED, OPTIMIZED, INFEASIBLE, UNBOUNDED, ALTERNATE };
     class LPP;
     class ComputationalTable;
+    class IPP;
 
     std::vector<std::map<algebra::Variable, algebra::Fraction>> basic_feasible_solutions(const std::vector<algebra::Equation>&);
 } // namespace lpp
 
 #include "src/lpp.hpp"
 #include "src/computation_table.hpp"
+#include "src/ipp.hpp"
