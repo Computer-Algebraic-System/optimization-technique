@@ -17,6 +17,7 @@ namespace optimization {
     std::ostream& operator<<(std::ostream&, const ComputationalTable&);
 
     class IPP;
+    class NLPP;
 
     std::vector<std::map<algebra::Variable, algebra::Fraction>> basic_feasible_solutions(const std::vector<algebra::Equation>&);
 } // namespace optimization
@@ -24,3 +25,4 @@ namespace optimization {
 #include "src/lpp.hpp"
 #include "src/computation_table.hpp"
 #include "src/ipp.hpp"
+#include "src/nlpp.hpp"
