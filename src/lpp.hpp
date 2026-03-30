@@ -3,7 +3,7 @@
 class optimization::LPP {
 public:
     Optimization type;
-    algebra::Polynomial objective;
+    algebra::SimplePolynomial objective;
     std::vector<algebra::Inequation> constraints, restrictions;
     inline static const algebra::Variable B{"@"}, M{"M"}, Z{"Z"}; // '@' for ascii arrangement
 
@@ -11,7 +11,7 @@ public:
 
     LPP() = default;
 
-    LPP(const Optimization type, const algebra::Polynomial& objective, const std::vector<algebra::Inequation>& constraints,
+    LPP(const Optimization type, const algebra::SimplePolynomial& objective, const std::vector<algebra::Inequation>& constraints,
         const std::vector<algebra::Inequation>& restrictions) :
         type(type), objective(objective), constraints(constraints), restrictions(restrictions) {} // need to add variables integrity check
 
@@ -62,15 +62,15 @@ public:
     }
 
     std::variant<std::map<algebra::Variable, algebra::Fraction>, Solution> optimize_graphical(const std::string& path) const {
-        assert(objective.expression.size() <= 2);
+        assert(objective.terms.size() <= 2);
         const int size = constraints.size();
         algebra::Point res;
         algebra::Fraction limit, optimal = type == Optimization::MAXIMIZE ? -algebra::inf : algebra::inf, second_optimal = optimal;
         algebra::Graph graph;
-        std::vector<algebra::Polynomial> polynomials;
+        std::vector<algebra::SimplePolynomial> polynomials;
         std::vector<algebra::Point> points{{0, 0}};
         const std::vector<std::vector<int>> combinations = algebra::detail::generate_combinations(size, 2);
-        graph.source_path = "/home/dream/github/optimization-technique/linear-algebra/algebra/utils/graph.py";
+        graph.source_path = "/home/dream/github/optimization-technique/tensor/algebra/utils/graph.py";
         polynomials.reserve(size);
         GLOBAL_FORMATTING << *this;
 
@@ -78,7 +78,7 @@ public:
             if (static_cast<algebra::Fraction>(constraint.rhs) != 0) {
                 polynomials.push_back(constraint.lhs / static_cast<algebra::Fraction>(constraint.rhs));
             }
-            for (const algebra::Variable& variable : polynomials.back().expression) {
+            for (const algebra::Variable& variable : polynomials.back().terms) {
                 if (variable.variables == algebra::Variable("x").variables) {
                     points.emplace_back(variable.coefficient.reciprocate(), 0);
                 } else if (variable.variables == algebra::Variable("y").variables) {
@@ -88,7 +88,7 @@ public:
         }
         for (const std::vector<int>& combination : combinations) {
             std::map<algebra::Variable, algebra::Fraction> solution =
-                linalg::solve_linear_system({algebra::Equation(constraints[combination[0]]), algebra::Equation(constraints[combination[1]])});
+                tensor::solve_linear_system({algebra::Equation(constraints[combination[0]]), algebra::Equation(constraints[combination[1]])});
             points.emplace_back(solution[algebra::Variable("x")], solution[algebra::Variable("y")]);
         }
         std::ranges::sort(points);
@@ -200,7 +200,7 @@ optimization::basic_feasible_solutions(const std::vector<algebra::Equation>& equ
         GLOBAL_FORMATTING << equation << std::endl;
     }
     for (const algebra::Equation& equation : equations) {
-        for (const algebra::Variable& variable : equation.lhs.expression) {
+        for (const algebra::Variable& variable : equation.lhs.terms) {
             variables[variable.basis()].push_back(variable.coefficient);
         }
         variables[LPP::B].push_back(static_cast<algebra::Fraction>(equation.rhs));
@@ -210,7 +210,7 @@ optimization::basic_feasible_solutions(const std::vector<algebra::Equation>& equ
     std::vector<std::map<algebra::Variable, algebra::Fraction>> result;
 
     for (const std::vector<int>& combination : algebra::detail::generate_combinations(n, k)) {
-        linalg::Matrix<algebra::Fraction> B(k, k), C(k, 1);
+        tensor::Matrix<algebra::Fraction> B(k, k), C(k, 1);
         std::vector<algebra::Variable> X;
         X.reserve(k);
 
@@ -223,7 +223,7 @@ optimization::basic_feasible_solutions(const std::vector<algebra::Equation>& equ
             X.push_back(itr->first);
             C[i, 0] = variables[LPP::B][i];
         }
-        linalg::Matrix<algebra::Fraction> res = B.inverse() * C;
+        tensor::Matrix<algebra::Fraction> res = B.inverse() * C;
         std::map<algebra::Variable, algebra::Fraction> element;
 
         for (int i = 0; i < k; i++) {
@@ -233,7 +233,7 @@ optimization::basic_feasible_solutions(const std::vector<algebra::Equation>& equ
     }
     GLOBAL_FORMATTING << "Basic Feasible Solutions:" << std::endl;
 
-    for (const auto& res : result) {
+    for (const std::map<algebra::Variable, algebra::Fraction>& res : result) {
         for (const auto& [variable, fraction] : res) {
             GLOBAL_FORMATTING << algebra::Equation(variable, fraction) << "  ";
         }

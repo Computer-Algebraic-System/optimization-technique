@@ -2,10 +2,10 @@
 #include <filesystem>
 #include <iomanip>
 #include <queue>
-#include "linear-algebra/linalg.hpp"
+#include "tensor/tensor.hpp"
 
 namespace optimization {
-    inline algebra::detail::FormatSettings& GLOBAL_FORMATTING = linalg::GLOBAL_FORMATTING;
+    inline algebra::detail::FormatSettings& GLOBAL_FORMATTING = algebra::GLOBAL_FORMATTING;
 
     enum class Optimization : bool { MINIMIZE, MAXIMIZE };
     enum class Solution : uint8_t { UNOPTIMIZED, OPTIMIZED, INFEASIBLE, UNBOUNDED, ALTERNATE };

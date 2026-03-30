@@ -2,7 +2,7 @@
 #include "optimization.hpp"
 
 using namespace algebra;
-using namespace linalg;
+using namespace tensor;
 using namespace optimization;
 
 void test(LPP&& lpp, const std::string& method = "simplex", const Variable& var = {}, const Matrix<Fraction>& coefficients = {}) {
@@ -60,7 +60,7 @@ void test(IPP&& ipp, const std::string& path) { auto x = ipp.optimize_branch_bou
 int main() {
     const Variable x("x"), y("y"), z("z"), x1("x1"), x2("x2"), x3("x3"), x4("x4"), x5("x5"), s1("s1"), s2("s2"), s3("s3");
     // optimization::GLOBAL_FORMATTING.toggle_file("output.txt");
-    // optimization::GLOBAL_FORMATTING.toggle_latex("latex.tex");
+    optimization::GLOBAL_FORMATTING.toggle_latex("latex.tex");
     test(LPP(Optimization::MAXIMIZE, 2 * x + 7 * y,
              {
                  3 * x + 5 * y <= 15,
@@ -555,7 +555,6 @@ int main() {
              },
              {x >= 0, y >= 0}),
          "outputs/ipp1");
-    /*
     test(IPP(Optimization::MAXIMIZE, 7 * x + 9 * y,
              {
                  -x + 3 * y <= 6,
@@ -586,6 +585,5 @@ int main() {
              },
              {x >= 0, y >= 0}),
          "outputs/ipp5");
-*/
     return 0;
 }

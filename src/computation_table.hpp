@@ -1,10 +1,10 @@
 #pragma once
 
 class optimization::ComputationalTable {
-    static algebra::Fraction extract_coefficient_M(const algebra::Polynomial& polynomial) {
-        const auto itr = std::ranges::find(polynomial.expression, LPP::M, &algebra::Variable::basis);
+    static algebra::Fraction extract_coefficient_M(const algebra::SimplePolynomial& polynomial) {
+        const auto itr = std::ranges::find(polynomial.terms, LPP::M, &algebra::Variable::basis);
 
-        if (itr != polynomial.expression.end()) {
+        if (itr != polynomial.terms.end()) {
             return itr->coefficient;
         }
         return static_cast<algebra::Fraction>(polynomial);
@@ -15,7 +15,7 @@ class optimization::ComputationalTable {
         zj_cj.clear();
 
         for (const algebra::Variable& variable : cost | std::views::keys) {
-            algebra::Polynomial polynomial;
+            algebra::SimplePolynomial polynomial;
 
             for (int i = 0; i < size; i++) {
                 polynomial += cost[basis_vector[i]] * coefficient_matrix[variable][i];
@@ -30,19 +30,19 @@ public:
     std::vector<algebra::Variable> basis_vector;
     std::map<algebra::Variable, algebra::Variable> cost;
     std::map<algebra::Variable, std::vector<algebra::Fraction>> coefficient_matrix;
-    std::vector<algebra::Polynomial> zj_cj;
+    std::vector<algebra::SimplePolynomial> zj_cj;
     std::vector<algebra::Fraction> mr;
     static constexpr int TAB_SIZE = 13;
 
     explicit ComputationalTable(const LPP& lpp) : lpp(lpp), solution(Solution::UNOPTIMIZED) {
         const int size = lpp.constraints.size();
-        linalg::Matrix<algebra::Fraction> unit_matrix = linalg::Matrix<algebra::Fraction>::make_identity(size);
+        auto unit_matrix = tensor::Matrix<algebra::Fraction>::make_identity(size);
 
-        for (const algebra::Variable& variable : lpp.objective.expression) {
+        for (const algebra::Variable& variable : lpp.objective.terms) {
             cost.emplace(variable.basis(), variable.coefficient);
         }
         for (const algebra::Inequation& constraint : lpp.constraints) {
-            for (const algebra::Variable& variable : constraint.lhs.expression) {
+            for (const algebra::Variable& variable : constraint.lhs.terms) {
                 cost.emplace(variable.basis(), 0);
             }
             coefficient_matrix[LPP::B].push_back(static_cast<algebra::Fraction>(constraint.rhs));
@@ -54,7 +54,7 @@ public:
             for (std::vector<algebra::Fraction>& fractions : coefficient_matrix | std::views::drop(1) | std::views::values) { // B
                 fractions.push_back(0);
             }
-            for (const algebra::Variable& variable : constraint.lhs.expression) {
+            for (const algebra::Variable& variable : constraint.lhs.terms) {
                 coefficient_matrix[variable.basis()].back() = variable.coefficient;
             }
         }
@@ -148,14 +148,14 @@ public:
             return solution;
         }
         const int size = coefficient_matrix[LPP::B].size();
-        linalg::Matrix<algebra::Fraction> unit_matrix = linalg::Matrix<algebra::Fraction>::make_identity(size);
+        auto unit_matrix = tensor::Matrix<algebra::Fraction>::make_identity(size);
 
         while (true) {
             if (solution != Solution::ALTERNATE) {
                 compute_zj_cj();
 
                 if (std::ranges::all_of(zj_cj,
-                                        [](const algebra::Polynomial& polynomial) -> bool { return extract_coefficient_M(polynomial) >= 0; })) {
+                                        [](const algebra::SimplePolynomial& polynomial) -> bool { return extract_coefficient_M(polynomial) >= 0; })) {
                     solution = std::ranges::contains(basis_vector, 'A',
                                                      [](const algebra::Variable& variable) -> char { return variable.variables[0].name[0]; })
                         ? Solution::INFEASIBLE
@@ -225,10 +225,10 @@ public:
             if (cost[basis_vector[lv]].variables == LPP::M.variables) {
                 coefficient_matrix.erase(basis_vector[lv]);
                 cost.erase(basis_vector[lv]);
-                auto itr = std::ranges::find(lpp.objective.expression, basis_vector[lv], &algebra::Variable::basis);
+                auto itr = std::ranges::find(lpp.objective.terms, basis_vector[lv], &algebra::Variable::basis);
 
-                if (itr != lpp.objective.expression.end()) {
-                    lpp.objective.expression.erase(itr);
+                if (itr != lpp.objective.terms.end()) {
+                    lpp.objective.terms.erase(itr);
                 }
             }
             const std::pair pivot = {ev->first, lv};
@@ -258,13 +258,13 @@ public:
     Solution optimize_dual_simplex() {
         solution = Solution::UNBOUNDED;
         const int size = coefficient_matrix[LPP::B].size();
-        linalg::Matrix<algebra::Fraction> unit_matrix = linalg::Matrix<algebra::Fraction>::make_identity(size);
+        auto unit_matrix = tensor::Matrix<algebra::Fraction>::make_identity(size);
 
         while (true) {
             compute_zj_cj();
 
-            if (std::ranges::all_of(zj_cj,
-                                    [](const algebra::Polynomial& polynomial) -> bool { return static_cast<algebra::Fraction>(polynomial) >= 0; }) &&
+            if (std::ranges::all_of(
+                    zj_cj, [](const algebra::SimplePolynomial& polynomial) -> bool { return static_cast<algebra::Fraction>(polynomial) >= 0; }) &&
                 std::ranges::all_of(coefficient_matrix[LPP::B], [](const algebra::Fraction& fraction) -> bool { return fraction >= 0; })) {
                 return solution = Solution::OPTIMIZED;
             }
@@ -379,10 +379,10 @@ public:
         return res;
     }
 
-    void add_variable(const algebra::Variable& variable, const linalg::Matrix<algebra::Fraction>& coefficients) {
+    void add_variable(const algebra::Variable& variable, const tensor::Matrix<algebra::Fraction>& coefficients) {
         int i = 0;
         const int size = basis_vector.size();
-        linalg::Matrix<algebra::Fraction> res(size, size);
+        tensor::Matrix<algebra::Fraction> res(size, size);
         lpp.objective += variable;
         GLOBAL_FORMATTING << *this;
 
@@ -436,18 +436,18 @@ public:
             std::views::transform([](const algebra::Variable& variable) -> int { return std::stoi(variable.variables[0].name.substr(1)); });
         const int size = basis_vector.size() + 1;
         const algebra::Variable slack("s" + std::to_string(*std::ranges::max_element(range) + 1));
-        algebra::Polynomial transformation;
+        algebra::SimplePolynomial transformation;
         substituent.resize(size);
         coefficient_matrix[LPP::B].push_back(static_cast<algebra::Fraction>(inequation.rhs));
 
-        for (const algebra::Variable& variable : inequation.lhs.expression) {
+        for (const algebra::Variable& variable : inequation.lhs.terms) {
             coefficient_matrix[variable.basis()].push_back(variable.coefficient);
 
             if (std::ranges::contains(basis_vector, variable.basis())) {
                 transformation += variable;
             }
         }
-        for (algebra::Variable& variable : transformation.expression) {
+        for (algebra::Variable& variable : transformation.terms) {
             const int idx = std::ranges::find(basis_vector, variable.basis()) - basis_vector.begin();
             const std::string name = "R" + std::to_string(idx + 1);
             variable = algebra::Variable(variable.coefficient, name);
@@ -513,7 +513,7 @@ public:
         }
         res.append("\\hline\n &  & Z_j - C_j & ");
 
-        for (const algebra::Polynomial& polynomial : zj_cj) {
+        for (const algebra::SimplePolynomial& polynomial : zj_cj) {
             res.append(polynomial.to_latex()).append(" & ");
         }
         return res.append("\\\\\n\\end{array}\n");
@@ -578,7 +578,7 @@ namespace std {
         }
         res.append(get_format(std::string("Zj-Cj"))).push_back('|');
 
-        for (const algebra::Polynomial& polynomial : computational_table.zj_cj) {
+        for (const algebra::SimplePolynomial& polynomial : computational_table.zj_cj) {
             res.append(get_format(polynomial)).push_back('|');
         }
         return res.append(optimization::ComputationalTable::TAB_SIZE, ' ').append("|\n").append(get_partition()).append("\n");
@@ -599,7 +599,7 @@ inline optimization::LPP optimization::LPP::dual(const std::string& basis) const
             constraint = constraint.invert();
         }
     }
-    const int objective_size = canonical.objective.expression.size(), constraints_size = canonical.constraints.size();
+    const int objective_size = canonical.objective.terms.size(), constraints_size = canonical.constraints.size();
     LPP res;
     ComputationalTable computational_table(canonical);
     std::erase_if(computational_table.coefficient_matrix, [](const std::pair<algebra::Variable, std::vector<algebra::Fraction>>& element) -> bool {
