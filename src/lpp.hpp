@@ -105,9 +105,9 @@ public:
             if (point.x >= 0 && point.y >= 0 &&
                 std::ranges::all_of(std::array{constraints, restrictions} | std::views::join,
                                     [&substituent](const algebra::Inequation& constraint) -> bool {
-                                        return static_cast<bool>(constraint.substitute(substituent));
+                                        return static_cast<bool>(constraint.substitute(substituent, false));
                                     })) {
-                const auto value = static_cast<algebra::Fraction>(objective.substitute(substituent));
+                const auto value = static_cast<algebra::Fraction>(objective.substitute(substituent, false));
 
                 if (type == Optimization::MAXIMIZE && optimal < value || type == Optimization::MINIMIZE && optimal > value) {
                     second_optimal = optimal;

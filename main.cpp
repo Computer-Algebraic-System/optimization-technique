@@ -1,4 +1,3 @@
-#include <fstream>
 #include "optimization.hpp"
 
 using namespace algebra;
@@ -57,7 +56,14 @@ void test(ComputationalTable&& table, const std::string& method = "simplex", con
 
 void test(IPP&& ipp, const std::string& path) { auto x = ipp.optimize_branch_bound(path); }
 
-void test(NLPP&& nlpp) { nlpp.optimize(); }
+void test(NLPP&& nlpp) {
+    auto res = nlpp.optimize();
+
+    for (const auto& [variable, fraction] : res) {
+        optimization::GLOBAL_FORMATTING << Equation(variable, fraction) << "  ";
+    }
+    optimization::GLOBAL_FORMATTING << std::endl;
+}
 
 int main() {
     const Variable x("x"), y("y"), z("z"), x1("x1"), x2("x2"), x3("x3"), x4("x4"), x5("x5"), s1("s1"), s2("s2"), s3("s3");
@@ -612,6 +618,22 @@ int main() {
     test(NLPP(Optimization::MINIMIZE, 2 * (x1 ^ 2) + 2 * (x2 ^ 2) - 24 * x1 - 8 * x2 + 2 * (x3 ^ 2) - 12 * x3 + 200,
               {
                   x1 + x2 + x3 == 11,
+              },
+              {x1 >= 0, x2 >= 0, x3 >= 0}));
+    test(NLPP(Optimization::MINIMIZE, 2 * (x1 ^ 2) + 12 * x1 * x2 - 7 * (x2 ^ 2),
+              {
+                  2 * x1 + 5 * x2 <= 98,
+              },
+              {x1 >= 0, x2 >= 0}));
+    test(NLPP(Optimization::MAXIMIZE, 8 * x1 + 10 * x2 - (x1 ^ 2) - (x2 ^ 2),
+              {
+                  3 * x1 + 2 * x2 <= 6,
+              },
+              {x1 >= 0, x2 >= 0}));
+    test(NLPP(Optimization::MAXIMIZE, -(x1 ^ 2) - (x2 ^ 2) - (x3 ^ 2) + 4 * x1 + 6 * x2,
+              {
+                  x1 + x2 <= 2,
+                  2 * x1 + 3 * x2 <= 12,
               },
               {x1 >= 0, x2 >= 0, x3 >= 0}));
     return 0;

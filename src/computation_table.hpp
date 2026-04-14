@@ -464,7 +464,7 @@ public:
             for (int i = 0; i < size - 1; i++) {
                 substituent[basis_vector[i]] = fractions[i];
             }
-            fractions.back() -= static_cast<algebra::Fraction>(transformation.substitute(substituent));
+            fractions.back() -= static_cast<algebra::Fraction>(transformation.substitute(substituent, false));
         }
         solution = Solution::UNOPTIMIZED;
         GLOBAL_FORMATTING << *this;
